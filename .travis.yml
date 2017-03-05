@@ -17,18 +17,15 @@ matrix:
   - env: export PYTHON=3.6; FAIL_ON_EXTERNAL_DEPRECATION='True'; MINIMAL_ENV='False'
 
 before_install:
-  - |
-    if [[ $MINIMAL_ENV == 'False' ]]
-      then
-      if [[ $TRAVIS_OS_NAME == 'osx' ]]
-        then
-        curl "https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh" -o miniconda.sh
-      else wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-      fi
-      chmod +x miniconda.sh
-      ./miniconda.sh -b -p $HOME/miniconda
-      export "PATH=$HOME/miniconda/bin:$PATH"
-      hash -r
+  - if [[ $MINIMAL_ENV == 'False' ]]; then
+      if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
+        curl "https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh" -o miniconda.sh;
+      else wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+      fi;
+      chmod +x miniconda.sh;
+      ./miniconda.sh -b -p $HOME/miniconda;
+      export "PATH=$HOME/miniconda/bin:$PATH";
+      hash -r;
     fi
 
 install:
