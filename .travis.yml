@@ -8,7 +8,7 @@ matrix:
     language: generic
   - env: export PYTHON=3.6; FAIL_ON_EXTERNAL_DEPRECATION='False'; MINIMAL_ENV='False'
   - env: export PYTHON=3.6; FAIL_ON_EXTERNAL_DEPRECATION='True'; MINIMAL_ENV='False'
-  - python: 3.6
+  - python: 3.5
     env: export FAIL_ON_EXTERNAL_DEPRECATION='False'; MINIMAL_ENV='True'
   - env: export PYTHON=3.6; FAIL_ON_EXTERNAL_DEPRECATION='False'; MINIMAL_ENV='False'; MPLBACKEND="agg"
     os: osx
