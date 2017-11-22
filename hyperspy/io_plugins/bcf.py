@@ -253,7 +253,7 @@ but compression signature is missing in the header. Aborting....""")
 
         offset = 0x80  # the 1st compression block header
         for dummy1 in range(self.no_of_compr_blk):
-            cpr_size = strct_unp('<I12x', self.read_piece(offset, 16))
+            cpr_size = strct_unp('<I12x', self.read_piece(offset, 16))[0]
             # cpr_size, dum_size, dum_unkn, dum_size2 = strct_unp('<IIII',...
             # dum_unkn is probably some kind of checksum but
             # none of known (crc16, crc32, adler32) algorithm could match.
@@ -646,7 +646,7 @@ class HyperHeader(object):
         if 'Mag' in self.sem_metadata:
             acq_inst['magnification'] = self.sem_metadata['Mag']
         if detector:
-            eds_metadata = self.spectra_data[index]
+            eds_metadata = self.get_spectra_metadata()
             acq_inst['Detector'] = {'EDS': {
                 'elevation_angle': eds_metadata.elevationAngle,
                 'detector_type': eds_metadata.detector_type,
