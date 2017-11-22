@@ -300,18 +300,7 @@ cdef void unpack16bit(channel_t[:, :, :] dest, int x, int y,
 
 def parse_to_numpy(virtual_file, shape, dtype, downsample=1):
     """parse the hyperspectral cube from brukers bcf binary file
-    and return it as numpy array
-    -------
-    arguments:
-    virtual_file -- virtual file handle returned by bcf.SFS_reader
-        or by class inheriting it
-    shape -- numpy shape
-    dtype -- numpy dtype
-    downsample -- downsample factor
-    -------
-    note!: downsample, shape and dtype are interconnected and needs
-    to be properly calculated otherwise wrong output or segfault
-    is expected"""
+    and return it as numpy array"""
     blocks, block_size = virtual_file.get_iter_and_properties()[:2]
     map_depth = shape[2]
     hypermap = np.zeros(shape, dtype=dtype)
