@@ -20,7 +20,7 @@ ctypedef fused channel_t:
 
 # instructivelly packed array structs:
 
-cdef packed struct Bunch_head: #size 2bytes
+cdef packed struct Bunch_head:  # size 2bytes
     uint8_t size
     uint8_t channels
 
@@ -298,19 +298,29 @@ cdef void unpack16bit(channel_t[:, :, :] dest, int x, int y,
 
 #the main function:
 
-def parse_to_numpy(bcf, downsample=1, cutoff=None, description=False):
-    blocks, block_size, total_blocks = bcf.get_iter_and_properties()
-    map_depth = bcf.sfs.header.estimate_map_channels()
-    if type(cutoff) == int:
-        map_depth = cutoff
-    dtype = bcf.sfs.header.estimate_map_depth(downsample=downsample)
-    shape = (-(-bcf.sfs.header.image.height // downsample),
-             -(-bcf.sfs.header.image.width // downsample),
-             map_depth)
-    if description:
-        return shape, dtype
-    hypermap = np.zeros(shape,
-                        dtype=dtype)
+def parse_to_numpy(virtual_file, shape, dtype, downsample=1):
+    """parse the hyperspectral cube from brukers bcf binary file
+    and return it as numpy array
+    -------
+    arguments:
+    virtual_file -- virtual file handle returned by bcf.SFS_reader
+        or by class inheriting it
+    shape -- numpy shape
+    dtype -- numpy dtype
+    downsample -- downsample factor
+    -------
+    note!: downsample, shape and dtype are interconnected and needs
+    to be properly calculated otherwise wrong output or segfault
+    is expected"""
+    blocks, block_size = virtual_file.get_iter_and_properties()[:2]
+    # MV this
+    #map_depth = bcf.sfs.header.estimate_map_channels()
+    #MV dtype = bcf.sfs.header.estimate_map_depth(downsample=downsample)
+    #MV shape = (-(-bcf.sfs.header.image.height // downsample),
+    #         -(-bcf.sfs.header.image.width // downsample),
+    #         map_depth)
+    map_depth = shape[2]
+    hypermap = np.zeros(shape, dtype=dtype)
     cdef DataStream data_stream = DataStream(blocks, block_size)
     if dtype == np.uint8:
         bin_to_numpy[uint8_t](data_stream, hypermap, map_depth, downsample)
