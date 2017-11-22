@@ -646,7 +646,7 @@ class HyperHeader(object):
         if 'Mag' in self.sem_metadata:
             acq_inst['magnification'] = self.sem_metadata['Mag']
         if detector:
-            eds_metadata = self.get_spectra_metadata(**kwargs)
+            eds_metadata = self.spectra_data[index]
             acq_inst['Detector'] = {'EDS': {
                 'elevation_angle': eds_metadata.elevationAngle,
                 'detector_type': eds_metadata.detector_type,
@@ -884,7 +884,7 @@ class BCF_reader(SFS_reader):
         self.header = HyperHeader(hd_bt_str, instrument=instrument)
         self.hypermap = {}
 
-    def persistent_parse_hypermap(self, index=0, downsample=None,
+    def persistent_parse_hypermap(self, index=0, downsample=1,
                                   cutoff_at_kV=None,
                                   lazy=False):
         """Parse and assign the hypermap to the HyperMap instance.
@@ -900,15 +900,14 @@ class BCF_reader(SFS_reader):
         See also:
         HyperMap, parse_hypermap
         """
-        dwn = downsample
         hypermap = self.parse_hypermap(index=index,
-                                       downsample=dwn,
+                                       downsample=downsample,
                                        cutoff_at_kV=cutoff_at_kV,
                                        lazy=lazy)
         self.hypermap[index] = HyperMap(hypermap,
                                         self,
                                         index=index,
-                                        downsample=dwn)
+                                        downsample=downsample)
 
     def parse_hypermap(self, index=0, downsample=1, cutoff_at_kV=None,
                        lazy=False):
@@ -935,7 +934,7 @@ class BCF_reader(SFS_reader):
         """
 
         if type(cutoff_at_kV) in (int, float):
-            eds = self.header.get_spectra_metadata()
+            eds = self.header.spectra_data[index]
             max_chan = eds.energy_to_channel(cutoff_at_kV)
         else:
             max_chan = self.header.estimate_map_channels(index=index)
@@ -975,7 +974,7 @@ class HyperMap(object):
     and its scale calibrations"""
 
     def __init__(self, nparray, parent, index=0, downsample=1):
-        sp_meta = parent.header.get_spectra_metadata(index=index)
+        sp_meta = parent.header.spectra_data[index]
         self.calib_abs = sp_meta.calibAbs  # in keV
         self.calib_lin = sp_meta.calibLin
         self.xcalib = parent.header.x_res * downsample
@@ -1018,16 +1017,6 @@ def py_parse_hypermap(virtual_file, shape, dtype, downsample=1):
     numpy array of bruker hypermap, with (y, x, E) shape.
     """
     iter_data, size_chnk = virtual_file.get_iter_and_properties()[:2]
-    ##############################################
-    #if isinstance(cutoff_at_channel, int):
-    #    max_chan = cutoff_at_channel
-    #else:
-    #    max_chan = self.header.estimate_map_channels(index=index)
-    #depth = self.header.estimate_map_depth(index=index,
-    #                                       downsample=downsample,
-    #                                       for_numpy=True)
-    #shape = (-(-height // dwn_factor), -(-width // dwn_factor), max_chan)
-    ################################################
     dwn_factor = downsample
     max_chan = shape[2]
     buffer1 = next(iter_data)
@@ -1238,7 +1227,7 @@ For more information, check the 'Installing HyperSpy' section in the documentati
         warn_once = False
     obj_bcf.persistent_parse_hypermap(index=index, downsample=downsample,
                                       cutoff_at_kV=cutoff_at_kV, lazy=lazy)
-    eds_metadata = obj_bcf.header.get_spectra_metadata(index=index)
+    eds_metadata = obj_bcf.header.spectra_data[index]
     mode = obj_bcf.header.mode
     mapping = get_mapping(mode)
     hyperspectra = [{'data': obj_bcf.hypermap[index].hypermap,

@@ -313,12 +313,6 @@ def parse_to_numpy(virtual_file, shape, dtype, downsample=1):
     to be properly calculated otherwise wrong output or segfault
     is expected"""
     blocks, block_size = virtual_file.get_iter_and_properties()[:2]
-    # MV this
-    #map_depth = bcf.sfs.header.estimate_map_channels()
-    #MV dtype = bcf.sfs.header.estimate_map_depth(downsample=downsample)
-    #MV shape = (-(-bcf.sfs.header.image.height // downsample),
-    #         -(-bcf.sfs.header.image.width // downsample),
-    #         map_depth)
     map_depth = shape[2]
     hypermap = np.zeros(shape, dtype=dtype)
     cdef DataStream data_stream = DataStream(blocks, block_size)
