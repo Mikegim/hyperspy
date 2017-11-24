@@ -1,7 +1,9 @@
 from operator import attrgetter
 import numpy as np
+from dask.array import Array as dArray
 from hyperspy.misc.utils import attrsetter
 from hyperspy.misc.export_dictionary import parse_flag_string
+from hyperspy import roi
 
 
 def _slice_target(target, dims, both_slices, slice_nav=None, issignal=False):
@@ -152,6 +154,25 @@ class FancySlicing(object):
             len(slices)
         except TypeError:
             slices = (slices,)
+
+        slices_ = tuple()
+        for sl in slices:
+            if isinstance(sl, roi.BaseROI):
+                if isinstance(sl, roi.SpanROI):
+                    slices_ += (slice(float(sl.left), float(sl.right), None),)
+                elif isinstance(sl, roi.Point1DROI):
+                    slices_ += (float(sl.value),)
+                elif isinstance(sl, roi.Point2DROI):
+                    slices_ += (float(sl.x), float(sl.y))
+                elif isinstance(sl, roi.RectangularROI):
+                    slices_ += (
+                        slice(float(sl.left), float(sl.right), None),
+                        slice(float(sl.top), float(sl.bottom), None),
+                    )
+            else:
+                slices_ += (sl,)
+        slices = slices_
+        del slices_
         _orig_slices = slices
 
         has_nav = True if isNavigation is None else isNavigation
@@ -209,7 +230,7 @@ class FancySlicing(object):
         array_slices = self._get_array_slices(slices, isNavigation)
         new_data = self.data[array_slices]
         if new_data.size == 1 and new_data.dtype is np.dtype('O'):
-            if isinstance(new_data[0], np.ndarray):
+            if isinstance(new_data[0], (np.ndarray, dArray)):
                 return self.__class__(new_data[0]).transpose(navigation_axes=0)
             else:
                 return new_data[0]
