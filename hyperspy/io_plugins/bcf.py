@@ -504,21 +504,16 @@ class EDXSpectrum(object):
         self.esma_metadata = dictionarize(esma_header)
         # USED:
         self.hv = self.esma_metadata['PrimaryEnergy']
-        self.elevationAngle = self.esma_metadata['ElevationAngle']
-        #self.azimutAngle = self.esma_metadata['AzimutAngle']
+        self.elev_angle = self.esma_metadata['ElevationAngle']
 
         # map stuff from spectra xml branch:
         self.spectrum_metadata = dictionarize(spectrum_header)
-        self.calibAbs = self.spectrum_metadata['CalibAbs']
-        self.calibLin = self.spectrum_metadata['CalibLin']
-        self.chnlCnt = self.spectrum_metadata['ChannelCount']
-
+        self.offset = self.spectrum_metadata['CalibAbs']
+        self.scale = self.spectrum_metadata['CalibLin']
+        
         # main data:
         self.data = np.fromstring(spectrum.find('./Channels').text,
                                   dtype='Q', sep=",")
-        self.energy = np.arange(self.calibAbs,
-                                self.calibLin * self.chnlCnt + self.calibAbs,
-                                self.calibLin)  # the x axis for ploting spectra
 
     def energy_to_channel(self, energy, kV=True):
         """ convert energy to channel index,
@@ -528,7 +523,7 @@ class EDXSpectrum(object):
             en_temp = energy / 1000.
         else:
             en_temp = energy
-        return int(round((en_temp - self.calibAbs) / self.calibLin))
+        return int(round((en_temp - self.offset) / self.scale))
 
 
 class HyperHeader(object):
@@ -631,9 +626,9 @@ class HyperHeader(object):
         if 'Mag' in self.sem_metadata:
             acq_inst['magnification'] = self.sem_metadata['Mag']
         if detector:
-            eds_metadata = self.get_spectra_metadata()
+            eds_metadata = self.get_spectra_metadata(**kwargs)
             acq_inst['Detector'] = {'EDS': {
-                'elevation_angle': eds_metadata.elevationAngle,
+                'elevation_angle': eds_metadata.elev_angle,
                 'detector_type': eds_metadata.detector_type,
                 'real_time': self.calc_real_time()}}
             if 'AzimutAngle' in eds_metadata.esma_metadata:
@@ -856,15 +851,10 @@ class BCF_reader(SFS_reader):
     filename
 
     Methods:
-    print_the_metadata, persistent_parse_hypermap, parse_hypermap,
-    py_parse_hypermap
-    (Inherited from SFS_reader: print_file_tree, get_file)
+    check_index_valid, parse_hypermap
 
     The class instantiates HyperHeader class as self.header attribute
-    where all metadata, sum eds spectras, (SEM) imagery are stored.
-    if persistent_parse_hypermap is called, the hypermap is stored
-    as instance of HyperMap inside the self.hypermap dictionary,
-    where index of the hypermap (default 0) is the key to the instance.
+    where all metadata, sum eds spectras, (SEM) images are stored.
     """
 
     def __init__(self, filename, instrument=None):
@@ -879,7 +869,7 @@ class BCF_reader(SFS_reader):
         self.def_index = min(self.available_indexes)
         header_byte_str = header_file.get_as_BytesIO_string().getvalue()
         hd_bt_str = fix_dec_patterns.sub(b'\\1.\\2', header_byte_str)
-        self.header = HyperHeader(header_byte_str, self.available_indexes, instrument=instrument)
+        self.header = HyperHeader(hd_bt_str, self.available_indexes, instrument=instrument)
         self.hypermap = {}
 
     def check_index_valid(self, index):
@@ -891,33 +881,6 @@ class BCF_reader(SFS_reader):
                 "Available maps are under indexes: {0}".format(str(self.available_indexes)))
         return index
     
-    def persistent_parse_hypermap(self, index=None, downsample=1,
-                                  cutoff_at_kV=None,
-                                  lazy=False):
-        """Parse and assign the hypermap to the HyperMap instance.
-
-        Arguments:
-        index -- index of hypermap in bcf if v2 (default 0)
-        downsample -- downsampling factor of hypermap (default None)
-        cutoff_at_kV -- low pass cutoff value at keV (default None)
-
-        Method does not return anything, it adds the HyperMap instance to
-        self.hypermap dictionary.
-
-        See also:
-        HyperMap, parse_hypermap
-        """
-        if index is None:
-            index = self.def_index
-        hypermap = self.parse_hypermap(index=index,
-                                       downsample=downsample,
-                                       cutoff_at_kV=cutoff_at_kV,
-                                       lazy=lazy)
-        self.hypermap[index] = HyperMap(hypermap,
-                                        self,
-                                        index=index,
-                                        downsample=downsample)
-
     def parse_hypermap(self, index=None,
                        downsample=1, cutoff_at_kV=None,
                        lazy=False):
@@ -975,22 +938,9 @@ class BCF_reader(SFS_reader):
         return result
 
     def add_filename_to_general(self, item):
+        """hypy helper method"""
         item['metadata']['General']['original_filename'] = \
             self.filename.split('/')[-1]
-
-
-class HyperMap(object):
-
-    """Container class to hold the parsed bruker hypermap
-    and its scale calibrations"""
-
-    def __init__(self, nparray, parent, index=0, downsample=1):
-        sp_meta = parent.header.spectra_data[index]
-        self.calib_abs = sp_meta.calibAbs  # in keV
-        self.calib_lin = sp_meta.calibLin
-        self.xcalib = parent.header.x_res * downsample
-        self.ycalib = parent.header.y_res * downsample
-        self.hypermap = nparray
 
 
 # dict of nibbles to struct notation for reading:
@@ -1197,14 +1147,14 @@ def file_reader(filename, select_type=None, index=None, downsample=1,     # noqa
     # objectified bcf file:
     obj_bcf = BCF_reader(filename, instrument=instrument)
     if select_type == 'image':
-        return bcf_imagery(obj_bcf)
+        return bcf_images(obj_bcf)
     elif select_type == 'spectrum':
         return bcf_hyperspectra(obj_bcf, index=index,
                                 downsample=downsample,
                                 cutoff_at_kV=cutoff_at_kV,
                                 lazy=lazy)
     else:
-        return bcf_imagery(obj_bcf) + bcf_hyperspectra(
+        return bcf_images(obj_bcf) + bcf_hyperspectra(
             obj_bcf,
             index=index,
             downsample=downsample,
@@ -1212,19 +1162,19 @@ def file_reader(filename, select_type=None, index=None, downsample=1,     # noqa
             lazy=lazy)
 
 
-def bcf_imagery(obj_bcf):
+def bcf_images(obj_bcf):
     """ return hyperspy required list of dict with sem
-    imagery and metadata.
+    images and metadata.
     """
-    imagery_list = []
+    images_list = []
     for img in obj_bcf.header.image.images:
         obj_bcf.add_filename_to_general(img)
-        imagery_list.append(img)
+        images_list.append(img)
     if hasattr(obj_bcf.header, 'overview'):
         for img2 in obj_bcf.header.overview.images:
             obj_bcf.add_filename_to_general(img2)
-            imagery_list.append(img2)
-    return imagery_list
+            images_list.append(img2)
+    return images_list
 
 
 def bcf_hyperspectra(obj_bcf, index=None, downsample=None, cutoff_at_kV=None,  # noqa
@@ -1249,26 +1199,29 @@ For more information, check the 'Installing HyperSpy' section in the documentati
     mode = obj_bcf.header.mode
     mapping = get_mapping(mode)
     for index in indexes:
-        obj_bcf.persistent_parse_hypermap(index=index, downsample=downsample,
-                                      cutoff_at_kV=cutoff_at_kV, lazy=lazy)
+        hypermap = obj_bcf.parse_hypermap(index=index,
+                                          downsample=downsample,
+                                          cutoff_at_kV=cutoff_at_kV,
+                                          lazy=lazy)
         eds_metadata = obj_bcf.header.get_spectra_metadata(index=index)
-        hyperspectra.append({'data': obj_bcf.hypermap[index].hypermap,
-                     'axes': [{'name': 'height',
-                               'size': obj_bcf.hypermap[index].hypermap.shape[0],
-                               'offset': 0,
-                               'scale': obj_bcf.hypermap[index].ycalib,
-                               'units': obj_bcf.header.units},
-                              {'name': 'width',
-                               'size': obj_bcf.hypermap[index].hypermap.shape[1],
-                               'offset': 0,
-                               'scale': obj_bcf.hypermap[index].xcalib,
-                               'units': obj_bcf.header.units},
-                              {'name': 'Energy',
-                               'size': obj_bcf.hypermap[index].hypermap.shape[2],
-                               'offset': obj_bcf.hypermap[index].calib_abs,
-                               'scale': obj_bcf.hypermap[index].calib_lin,
-                               'units': 'keV'}],
-                     'metadata':
+        hyperspectra.append(
+            {'data': hypermap,
+             'axes': [{'name': 'height',
+                       'size': hypermap.shape[0],
+                       'offset': 0,
+                       'scale': obj_bcf.header.y_res * downsample,
+                       'units': obj_bcf.header.units},
+                      {'name': 'width',
+                       'size': hypermap.shape[1],
+                       'offset': 0,
+                       'scale': obj_bcf.header.y_res * downsample,
+                       'units': obj_bcf.header.units},
+                      {'name': 'Energy',
+                       'size': hypermap.shape[2],
+                       'offset': eds_metadata.offset,
+                       'scale': eds_metadata.scale,
+                       'units': 'keV'}],
+             'metadata':
                      # where is no way to determine what kind of instrument was used:
                      # TEM or SEM
                      {'Acquisition_instrument': {
